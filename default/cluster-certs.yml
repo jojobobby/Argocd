@@ -1,31 +1,31 @@
- apiVersion: cert-manager.io/v1
-  kind: Certificate
-  metadata:
-    name: betterourself.com
-    namespace: betterus-production
-  spec:
-    secretName: betterourself.com-tls
-    issuerRef:
-      name: letsencrypt-prod
-      kind: ClusterIssuer
-    dnsNames:
-      - betterourself.com
-      - www.betterourself.com
-      - api.betterourself.com
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: betterourself.com
+  namespace: betterus-production
+spec:
+  secretName: betterourself.com-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - betterourself.com
+    - www.betterourself.com
+    - api.betterourself.com
 ---
 apiVersion: cert-manager.io/v1
-  kind: Certificate
-  metadata:
-    name: dev.betterourself.com
-    namespace: betterus-development
-  spec:
-    secretName: dev.betterourself.com-tls
-    issuerRef:
-      name: letsencrypt-prod
-      kind: ClusterIssuer
-    dnsNames:
-      - dev.betterourself.com
-      - api-dev.betterourself.com
+kind: Certificate
+metadata:
+  name: dev.betterourself.com
+  namespace: betterus-development
+spec:
+  secretName: dev.betterourself.com-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - dev.betterourself.com
+    - api-dev.betterourself.com
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -76,9 +76,9 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-staging
     solvers:
-    - http01:
-        ingress:
-          class: nginx
+      - http01:
+          ingress:
+            class: nginx
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -91,9 +91,9 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-prod
     solvers:
-    - http01:
-        ingress:
-          class: nginx
+      - http01:
+          ingress:
+            class: nginx
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -106,5 +106,5 @@ spec:
     name: letsencrypt-staging
     kind: ClusterIssuer
   dnsNames:
-  - services.rrobinson.me
-  - www.services.rrobinson.me
+    - services.rrobinson.me
+    - www.services.rrobinson.me
