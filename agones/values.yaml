@@ -1,0 +1,19 @@
+agones:
+  agones:
+    featureGates: "PlayerTracking=true"
+    metrics:
+      prometheusEnabled: false
+    allocator:
+      service:
+        serviceType: ClusterIP
+    ping:
+      http:
+        serviceType: ClusterIP
+      udp:
+        serviceType: ClusterIP
+  gameservers:
+    namespaces:
+      - cosmic-production
+      - cosmic-development
+    minPort: 7000
+    maxPort: 8000
