@@ -1,0 +1,11 @@
+argo-cd:
+  server:
+    extraArgs:
+      - --insecure
+    ingress:
+      enabled: true
+      ingressClassName: haproxy
+      hostname: services.rrobinson.me
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      tls: true
