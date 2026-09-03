@@ -415,6 +415,23 @@ alloy:
 
         loki.source.kubernetes "pods" {
           targets    = discovery.relabel.pods.output
+          forward_to = [loki.process.privacy.receiver]
+        }
+
+        // ---- Privacy: player / visitor IP addresses never reach Loki -----------------
+        // The Cosmic game servers log every connecting client's address and the wiki's
+        // Apache access log carries visitor addresses. Grafana OSS cannot hide fields per
+        // user, and Cosmic dashboards are shared with viewer accounts, so IPv4 addresses
+        // in the Cosmic namespaces are masked BEFORE storage. The unmasked originals stay
+        // only in the servers' own log files on the node (/cosmic/<env>/filesystem/logs).
+        loki.process "privacy" {
+          stage.match {
+            selector = "{namespace=~\"cosmic-.*\"}"
+            stage.replace {
+              expression = "((?:\d{1,3}\.){3}\d{1,3})"
+              replace    = "[ip]"
+            }
+          }
           forward_to = [loki.write.default.receiver]
         }
 
