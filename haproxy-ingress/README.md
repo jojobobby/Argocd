@@ -16,8 +16,8 @@ Installed by hand with Helm on 2026-05-01 (`helm install haproxy-ingress ...`, r
 adopted into GitOps on 2026-09-03. Before the takeover a render of the same chart version with
 the release's own values was diffed against the live manifest and every persistent resource was
 identical, so ArgoCD's first sync only added the `ssl-redirect-port` key to the ConfigMap. The
-old Helm release record (`sh.helm.release.v1.haproxy-ingress.*` Secrets) is inert and can be
-deleted at any time.
+old Helm release records (`sh.helm.release.v1.haproxy-ingress.*` Secrets) were deleted the
+same day; `helm list` no longer knows the release and ArgoCD is the only owner.
 
 ## Why `ssl-redirect-port: "443"`
 
