@@ -1,0 +1,429 @@
+# Values for the monitoring-stack umbrella chart.
+#
+# Everything is routed to the three VENDORED subcharts by their chart names:
+#   kube-prometheus-stack:  Prometheus Operator + Prometheus + Alertmanager + Grafana
+#                           + node-exporter + kube-state-metrics + default rules/dashboards
+#   loki:                   Loki (single binary, filesystem storage, 30-day retention)
+#   alloy:                  Grafana Alloy DaemonSet shipping pod logs + k8s events to Loki
+#
+# The cluster is a single-node k3s box (machine-01: 8 CPU / 64 GiB, public IP, no host
+# firewall, only the `local-path` StorageClass). Sizing, security and component choices
+# below are tuned for that; see README.md for the reasoning behind each block.
+
+# =============================================================================
+# kube-prometheus-stack
+# =============================================================================
+kube-prometheus-stack:
+  # Short, stable resource names: Prometheus/Alertmanager CRs are simply `kps`
+  # (pods prometheus-kps-0 / alertmanager-kps-0), the operator is `kps-operator`.
+  fullnameOverride: kps
+  cleanPrometheusOperatorObjectNames: true
+
+  # The CRDs render as ordinary manifests. They are large - the ArgoCD Application
+  # MUST sync with ServerSideApply=true (client-side apply overflows the annotation).
+  crds:
+    enabled: true
+
+  defaultRules:
+    create: true
+
+  # ---------------------------------------------------------------------------
+  # k3s runs the control plane inside the k3s process: controller-manager,
+  # scheduler and kube-proxy only listen on 127.0.0.1, and there is no etcd
+  # (sqlite/kine datastore). None of them can be scraped from a pod, so disable
+  # the targets - the same flags gate their default "<component>Down" alerts.
+  # ---------------------------------------------------------------------------
+  kubeControllerManager:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeProxy:
+    enabled: false
+
+  prometheusOperator:
+    admissionWebhooks:
+      enabled: true
+      # cert-manager is already in the cluster: let it issue the webhook certificate
+      # instead of the chart's kube-webhook-certgen Jobs (Helm hooks, which ArgoCD
+      # handles poorly). cert-manager's cainjector fills the webhook caBundle, hence
+      # the ignoreDifferences block on the ArgoCD Application.
+      certManager:
+        enabled: true
+      patch:
+        enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+  prometheus:
+    prometheusSpec:
+      retention: 15d
+      # Hard cap so the PVC can never fill up (leave headroom under the 30Gi claim).
+      retentionSize: 25GiB
+      scrapeInterval: 30s
+      evaluationInterval: 30s
+      externalLabels:
+        cluster: rrobinson-services
+      # Select ServiceMonitors / PodMonitors / PrometheusRules / Probes / ScrapeConfigs
+      # from EVERY namespace regardless of labels. This is what lets the Cosmic chart
+      # (and any other service) declare its own scrape targets, alerts and dashboards
+      # in its own repo instead of here.
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      probeSelectorNilUsesHelmValues: false
+      scrapeConfigSelectorNilUsesHelmValues: false
+      resources:
+        requests:
+          cpu: 200m
+          memory: 1Gi
+        limits:
+          memory: 3Gi
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 30Gi
+
+  alertmanager:
+    enabled: true
+    alertmanagerSpec:
+      retention: 120h
+      resources:
+        requests:
+          cpu: 20m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+      storage:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 2Gi
+    # Routing is the chart default: every alert goes to a 'null' receiver, so nothing
+    # pages anyone yet. To get notified, add a receiver (discord_configs /
+    # slack_configs / webhook_configs) under `alertmanager.config` and point
+    # `route.receiver` at it - see README.md "Alert notifications".
+
+  grafana:
+    enabled: true
+    defaultDashboardsEnabled: true
+    defaultDashboardsTimezone: browser
+    # Admin credentials are NEVER in git: the chart reads them from the
+    # `grafana-admin-secret` Secret in the release namespace (secret.example.yaml).
+    admin:
+      existingSecret: grafana-admin-secret
+      userKey: admin-user
+      passwordKey: admin-password
+    # haproxy ingress + cert-manager TLS, matching the other rrobinson.me services.
+    ingress:
+      enabled: true
+      ingressClassName: haproxy
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        - grafana.rrobinson.me
+      tls:
+        - secretName: grafana.rrobinson.me-tls
+          hosts:
+            - grafana.rrobinson.me
+    grafana.ini:
+      server:
+        root_url: https://grafana.rrobinson.me
+      analytics:
+        check_for_updates: false
+        reporting_enabled: false
+      security:
+        cookie_secure: true
+    # Keep user-created dashboards, API keys, alert state etc. across restarts.
+    # RWO volume on a single node -> Recreate so an update never needs two pods.
+    persistence:
+      enabled: true
+      size: 5Gi
+    deploymentStrategy:
+      type: Recreate
+    sidecar:
+      dashboards:
+        enabled: true
+        # Any ConfigMap labelled grafana_dashboard=1 in ANY namespace becomes a
+        # dashboard; the grafana_folder annotation picks the folder (e.g. "Cosmic").
+        searchNamespace: ALL
+        folderAnnotation: grafana_folder
+        provider:
+          foldersFromFilesStructure: true
+      datasources:
+        enabled: true
+    # Prometheus is provisioned automatically by the chart; add Loki next to it.
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://loki.monitoring.svc.cluster.local:3100
+        isDefault: false
+        editable: false
+        jsonData:
+          maxLines: 1000
+          timeout: 60
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 768Mi
+    # Don't render `helm test` pods - ArgoCD never runs them.
+    testFramework:
+      enabled: false
+
+  prometheus-node-exporter:
+    # SECURITY: machine-01 has a public IP and no host firewall (the Cosmic gameserver's
+    # host-network metrics port answers from the internet). The upstream default
+    # hostNetwork:true would publish node-exporter on <public-ip>:9100 as well, so it
+    # runs on the pod network instead. Host CPU / memory / disk / filesystem / load
+    # metrics still come from the hostPath /proc, /sys and / mounts (hostPID stays on);
+    # only node_network_* reflects the pod's own network namespace.
+    hostNetwork: false
+    hostPID: true
+    hostRootFsMount:
+      enabled: true
+    resources:
+      requests:
+        cpu: 20m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+
+  kube-state-metrics:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+
+# =============================================================================
+# Loki - single binary, filesystem storage, 30-day retention
+# =============================================================================
+loki:
+  fullnameOverride: loki
+  deploymentMode: SingleBinary
+
+  loki:
+    # Single tenant: Alloy pushes without an X-Scope-OrgID header.
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
+      filesystem:
+        chunks_directory: /var/loki/chunks
+        rules_directory: /var/loki/rules
+    schemaConfig:
+      configs:
+        - from: "2026-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+    limits_config:
+      retention_period: 30d
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+      ingestion_rate_mb: 8
+      ingestion_burst_size_mb: 16
+      volume_enabled: true
+    # Retention is enforced by the compactor; both settings are required for it.
+    compactor:
+      working_directory: /var/loki/compactor
+      compaction_interval: 10m
+      retention_enabled: true
+      retention_delete_delay: 2h
+      delete_request_store: filesystem
+    ingester:
+      chunk_encoding: snappy
+    # Powers Grafana's log-pattern / drilldown views; cheap at this volume.
+    pattern_ingester:
+      enabled: true
+    querier:
+      max_concurrent: 4
+    analytics:
+      reporting_enabled: false
+
+  singleBinary:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+    persistence:
+      enabled: true
+      size: 30Gi
+      # Never let a StatefulSet delete/scale (e.g. an ArgoCD prune) take the logs with it.
+      whenDeleted: Retain
+      whenScaled: Retain
+
+  # Everything below is the simple-scalable / distributed machinery the single
+  # binary replaces, plus the accessories that only make sense at scale.
+  backend:
+    replicas: 0
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+  gateway:
+    enabled: false
+  lokiCanary:
+    enabled: false
+  test:
+    enabled: false
+  # memcached caches default to 1 GiB + 8 GiB of memory - pointless on one node.
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+  minio:
+    enabled: false
+  # No ruler rules delivered via ConfigMaps (drops a sidecar container).
+  sidecar:
+    rules:
+      enabled: false
+
+  monitoring:
+    # Loki's own metrics -> Prometheus (picked up by the all-namespaces selector).
+    # metricsInstance/selfMonitoring are the legacy grafana-agent-operator path: off.
+    serviceMonitor:
+      enabled: true
+      metricsInstance:
+        enabled: false
+    selfMonitoring:
+      enabled: false
+      grafanaAgent:
+        installOperator: false
+    # Loki's operational dashboards -> Grafana, in a "Loki" folder.
+    dashboards:
+      enabled: true
+      annotations:
+        grafana_folder: Loki
+    # Loki's alert rules -> Prometheus. The canary is disabled, so drop its alert.
+    rules:
+      enabled: true
+      alerting: true
+      configs:
+        LokiCanaryLatency:
+          enabled: false
+
+# =============================================================================
+# Alloy - DaemonSet shipping container logs + Kubernetes events to Loki
+# =============================================================================
+alloy:
+  fullnameOverride: alloy
+  # We don't use the PodLogs CRD (`loki.source.podlogs`); skip installing it.
+  crds:
+    create: false
+  controller:
+    type: daemonset
+  serviceMonitor:
+    enabled: true
+  alloy:
+    enableReporting: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+    configMap:
+      create: true
+      content: |
+        logging {
+          level  = "warn"
+          format = "logfmt"
+        }
+
+        // ---- Container logs: every pod on this node, tailed via the kubelet API ----
+        // K8S_NODE_NAME is injected by the alloy chart (fieldRef spec.nodeName), so each
+        // DaemonSet instance only tails the pods scheduled on its own node.
+        discovery.kubernetes "pods" {
+          role = "pod"
+          selectors {
+            role  = "pod"
+            field = "spec.nodeName=" + sys.env("K8S_NODE_NAME")
+          }
+        }
+
+        discovery.relabel "pods" {
+          targets = discovery.kubernetes.pods.targets
+
+          // Finished pods have nothing left to tail.
+          rule {
+            source_labels = ["__meta_kubernetes_pod_phase"]
+            regex         = "Succeeded|Failed"
+            action        = "drop"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_namespace"]
+            target_label  = "namespace"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_container_name"]
+            target_label  = "container"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_node_name"]
+            target_label  = "node"
+          }
+          // app = the pod's `app` label (Cosmic, Harbor, ...), falling back to
+          // app.kubernetes.io/name (Helm-standard charts).
+          rule {
+            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+            target_label  = "app"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_label_app"]
+            regex         = "(.+)"
+            target_label  = "app"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_container_name"]
+            separator     = "/"
+            target_label  = "job"
+          }
+        }
+
+        loki.source.kubernetes "pods" {
+          targets    = discovery.relabel.pods.output
+          forward_to = [loki.write.default.receiver]
+        }
+
+        // ---- Kubernetes events (scheduling failures, image pulls, OOM kills, ...) ----
+        loki.source.kubernetes_events "events" {
+          job_name   = "kubernetes-events"
+          forward_to = [loki.write.default.receiver]
+        }
+
+        // ---- Ship everything to Loki ---------------------------------------------
+        loki.write "default" {
+          endpoint {
+            url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+          }
+          external_labels = {
+            cluster = "rrobinson-services",
+          }
+        }

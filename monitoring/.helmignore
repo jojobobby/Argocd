@@ -1,0 +1,9 @@
+# Patterns to ignore when packaging the umbrella chart.
+.DS_Store
+.git/
+.gitignore
+*.tmp
+*.bak
+*.swp
+README.md
+secret.example.yaml

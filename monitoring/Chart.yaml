@@ -1,0 +1,44 @@
+apiVersion: v2
+name: monitoring-stack
+description: >-
+  Tidan-managed umbrella chart that deploys the cluster observability stack onto the
+  shared k3s cluster via ArgoCD: kube-prometheus-stack (Prometheus Operator, Prometheus,
+  Alertmanager, Grafana, node-exporter, kube-state-metrics), Loki (logs) and Grafana
+  Alloy (log shipping). The three upstream charts are vendored as subcharts under
+  charts/ and every setting lives in values.yaml under the subchart's name.
+type: application
+# Version of THIS umbrella wrapper. Bump on values/structure changes.
+version: 0.1.0
+# Tracks the vendored application versions:
+#   kube-prometheus-stack 88.6.4 -> prometheus-operator v0.93.1, Grafana 13.2.0
+#   loki 7.3.0                  -> Loki 3.6.12
+#   alloy 1.12.1                -> Alloy v1.19.2
+appVersion: "operator-0.93.1_grafana-13.2.0_loki-3.6.12_alloy-1.19.2"
+
+# NOTE on the subcharts:
+# kube-prometheus-stack, loki and alloy are VENDORED as packaged subcharts in charts/
+# and declared below with an EMPTY repository. Helm documents that form as "the chart
+# already exists in the charts/ directory": `helm dependency build` skips the download
+# (no network, no repo credentials at ArgoCD sync time) and `helm template` loads the
+# tgz straight from charts/.
+#
+# They must be declared (unlike the Harbor/Jenkins stacks, which leave dependencies:
+# out): Helm only evaluates `condition:` flags when the parent chart declares its
+# dependencies, and without that every NESTED subchart renders unconditionally -
+# Loki's bundled MinIO, rollout-operator and grafana-agent-operator, and
+# kube-prometheus-stack's windows-exporter would all be deployed. Keep the versions
+# here identical to the tgz file names.
+#
+# To upgrade a component: drop the new tgz into charts/, delete the old one, bump the
+# version below and appVersion above, and reconcile values against the new upstream
+# values.yaml. See monitoring/README.md.
+dependencies:
+  - name: kube-prometheus-stack
+    version: 88.6.4
+    repository: ""
+  - name: loki
+    version: 7.3.0
+    repository: ""
+  - name: alloy
+    version: 1.12.1
+    repository: ""
