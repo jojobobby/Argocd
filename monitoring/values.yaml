@@ -160,6 +160,12 @@ kube-prometheus-stack:
         folderAnnotation: grafana_folder
         provider:
           foldersFromFilesStructure: true
+        # kube-prometheus-stack's own dashboards carry this annotation, so they land in a
+        # "Kubernetes" folder instead of the root. Folders are the permission boundary:
+        # Viewer accounts are granted the Cosmic folder only (Kubernetes and Loki folders
+        # have the Viewer role removed in Grafana), see README "Users and access".
+        annotations:
+          grafana_folder: Kubernetes
       datasources:
         enabled: true
     # Prometheus is provisioned automatically by the chart; add Loki next to it.
