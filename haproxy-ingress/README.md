@@ -9,6 +9,7 @@ through the LoadBalancer Service in the `haproxy-ingress` namespace (MetalLB, 14
 | Chart | `kubernetes-ingress` 1.42.0 from https://haproxytech.github.io/helm-charts (controller 3.0.4), declared as a dependency like `argocd/` and `cnpg-operator/` — ArgoCD runs `helm dependency build` at sync |
 | ArgoCD app | `Both/Arcana-Argocd-Apps/prod/haproxy-ingress.yaml` → path `haproxy-ingress/`, **releaseName `haproxy-ingress`** (do not change: resource names and the `--configmap` / `--publish-service` arguments derive from it) |
 | Config | `values.yaml` — all controller settings, including the global ConfigMap keys under `controller.config` |
+| Metrics | HAProxy's native Prometheus metrics on the stat port (1024), served only through the ClusterIP Service `haproxy-ingress-kubernetes-ingress-metrics` and scraped via the chart's ServiceMonitor. The stat and prometheus ports were removed from the public LoadBalancer on 2026-09-03 (`http://147.135.8.100:1024/metrics` used to answer from the internet); server-side apply could not drop the pre-existing port entries itself, so they were removed once by hand with `kubectl patch`. |
 
 ## History
 

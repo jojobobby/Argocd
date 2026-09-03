@@ -175,6 +175,7 @@ Grafana OSS has no per-datasource permissions, so **folders are the access bound
 | Folder | Content | Who can see it |
 |---|---|---|
 | `Cosmic` | Cosmic / Overview (from the Cosmic-LTS chart) | everyone, including the Viewer role and the `Cosmic Viewers` team |
+| `Cosmic Wiki` | Cosmic / Wiki (from the Cosmic-LTS chart, wiki-enabled releases only) | everyone, same as `Cosmic` |
 | `Kubernetes` | the 25 kube-prometheus-stack dashboards (annotated via `grafana.sidecar.dashboards.annotations` in values.yaml) | Editors and Admins only — the Viewer role's permission was removed from the folder |
 | `Loki` | Loki's operational dashboards | Editors and Admins only — same |
 
@@ -192,6 +193,23 @@ them to the `Cosmic Viewers` team (or just leave them as Viewer — the Cosmic f
 visible to the whole Viewer role). To hide a new folder from Viewers: folder → Manage →
 Permissions → remove the `Viewer` role entry. Dashboards a service publishes without a
 `grafana_folder` annotation land in the root and are visible to Viewers.
+
+## Privacy: player IP addresses
+
+The Cosmic game servers log every connecting client's address and the wiki's Apache access
+log carries visitor addresses. Because Cosmic dashboards are shared with viewer accounts and
+Grafana OSS cannot hide fields per user, IPv4 addresses are masked **before storage**: the
+Alloy pipeline (`loki.process "privacy"` in values.yaml) rewrites every IPv4 in the
+`cosmic-*` namespaces to `[ip]`. Nothing in Loki, and therefore nothing in Grafana, contains
+a player address; the unmasked originals exist only in the servers' own log files on the
+node. Lines stored before the rule went live (2026-09-03 22:30 UTC) were purged with a Loki
+delete request. The viewer-facing log panels additionally apply a `line_format` mask at
+query time. IPv6 is not masked: players reach the servers over IPv4 only (the LoadBalancer
+and the game hostPorts are IPv4).
+
+Ingress traffic metrics come from the HAProxy ingress controller (`haproxy_backend_*`,
+`haproxy_frontend_*`) via its ServiceMonitor in the `haproxy-ingress` namespace; they carry
+backend names, never client addresses.
 
 ## Alert notifications
 
