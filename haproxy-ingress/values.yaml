@@ -1,0 +1,31 @@
+# haproxytech kubernetes-ingress 1.42.0 (controller 3.0.4), keyed by the subchart name.
+#
+# These are the values of the original hand-installed Helm release (`helm get values
+# haproxy-ingress -n haproxy-ingress`) plus the two blocks marked ADDED. A render with only
+# the original values was diffed against the live manifest before the takeover: every
+# persistent resource (Deployment, Service, ConfigMap, RBAC, IngressClass) was identical, so
+# adopting the release changed nothing but the ConfigMap. Anything you change here is
+# picked up by the running controller through its ConfigMap - no pod restart.
+kubernetes-ingress:
+  controller:
+    kind: Deployment
+    ingressClassResource:
+      default: true
+    service:
+      type: LoadBalancer
+
+    # ADDED: the fallback certificate served for unknown hostnames is the self-signed Secret
+    # the original install generated as a Helm pre-install hook (2026-05-01). Referencing it
+    # as an existing secret stops the chart from re-generating it - under ArgoCD that hook
+    # would otherwise rotate the certificate on EVERY sync. The rendered
+    # --default-ssl-certificate argument is identical to the live one.
+    defaultTLSSecret:
+      enabled: true
+      secret: haproxy-ingress-kubernetes-ingress-default-cert
+
+    # ADDED: controller-wide configuration (haproxy.org global ConfigMap keys).
+    config:
+      # The controller listens on 8443 inside the pod and, by default, builds its HTTP->HTTPS
+      # redirects with that port, so `http://<host>/` used to bounce every visitor to
+      # https://<host>:8443/ - which nothing answers. The Service exposes 443; say so.
+      ssl-redirect-port: "443"

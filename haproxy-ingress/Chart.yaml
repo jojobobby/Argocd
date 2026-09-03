@@ -1,0 +1,13 @@
+apiVersion: v2
+name: haproxy-ingress
+description: >-
+  HAProxy Kubernetes Ingress Controller (haproxytech kubernetes-ingress) for the shared k3s
+  cluster - the single ingress class (`haproxy`) every service in the cluster uses. Adopted
+  into GitOps on 2026-09-03 from the hand-installed Helm release of the same name and chart
+  version; the ArgoCD Application MUST keep releaseName `haproxy-ingress` so every resource
+  keeps its name (haproxy-ingress-kubernetes-ingress).
+version: 1.0.0
+dependencies:
+  - name: kubernetes-ingress
+    version: 1.42.0
+    repository: https://haproxytech.github.io/helm-charts
