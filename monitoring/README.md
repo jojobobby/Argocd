@@ -168,6 +168,31 @@ Logs need nothing at all: Alloy tails every container on the node and labels lin
 `app.kubernetes.io/name`) and `job=<namespace>/<container>`. Kubernetes events land under
 `job="kubernetes-events"`. In Grafana → Explore → Loki: `{namespace="cosmic-production"}`.
 
+## Users and access
+
+Grafana OSS has no per-datasource permissions, so **folders are the access boundary**:
+
+| Folder | Content | Who can see it |
+|---|---|---|
+| `Cosmic` | Cosmic / Overview (from the Cosmic-LTS chart) | everyone, including the Viewer role and the `Cosmic Viewers` team |
+| `Kubernetes` | the 25 kube-prometheus-stack dashboards (annotated via `grafana.sidecar.dashboards.annotations` in values.yaml) | Editors and Admins only — the Viewer role's permission was removed from the folder |
+| `Loki` | Loki's operational dashboards | Editors and Admins only — same |
+
+Accounts (all created through the admin API, none in git):
+
+- `admin` — the chart's built-in admin, password in the `grafana-admin-secret` Secret.
+- `raphealsmall@gmail.com` — Grafana **Server Admin** + Main Org **Admin** (the owner's account).
+- `dangergun`, `germoele`, `loxis` — Main Org **Viewer**, members of team `Cosmic Viewers`.
+  A Viewer can open the Cosmic dashboards and their panels query Prometheus/Loki through
+  them, but has **no Explore access** (the Viewer role lacks `datasources:explore`) and
+  cannot see the Kubernetes or Loki folders.
+
+To add another Cosmic viewer: Administration → Users → New user, role **Viewer**, then add
+them to the `Cosmic Viewers` team (or just leave them as Viewer — the Cosmic folder is
+visible to the whole Viewer role). To hide a new folder from Viewers: folder → Manage →
+Permissions → remove the `Viewer` role entry. Dashboards a service publishes without a
+`grafana_folder` annotation land in the root and are visible to Viewers.
+
 ## Alert notifications
 
 Alertmanager runs with the chart's default routing: everything goes to a `null` receiver, so
