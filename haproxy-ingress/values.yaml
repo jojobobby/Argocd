@@ -13,6 +13,23 @@ kubernetes-ingress:
       default: true
     service:
       type: LoadBalancer
+      # ADDED: the stats/metrics port used to be published on the public LoadBalancer IP
+      # (http://147.135.8.100:1024/metrics answered from the internet with every backend
+      # and host name in the cluster). Only the traffic ports stay public; metrics are
+      # served to Prometheus through the dedicated ClusterIP metrics Service the chart
+      # creates when the stat port is kept off the LoadBalancer.
+      enablePorts:
+        http: true
+        https: true
+        quic: true
+        stat: false
+        prometheus: false
+
+    # ADDED: HAProxy's native Prometheus metrics (per-backend requests, response codes,
+    # response times, sessions) scraped by the cluster-wide Prometheus - it selects
+    # ServiceMonitors from every namespace, so no extra labels are needed.
+    serviceMonitor:
+      enabled: true
 
     # ADDED: the fallback certificate served for unknown hostnames is the self-signed Secret
     # the original install generated as a Helm pre-install hook (2026-05-01). Referencing it
