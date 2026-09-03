@@ -72,7 +72,7 @@ helm template monitoring . -f values.yaml --namespace monitoring --include-crds 
 
    Read it back: `kubectl -n monitoring get secret grafana-admin-secret -o jsonpath='{.data.admin-password}' | base64 -d`
 
-2. **DNS**: `grafana.rrobinson.me` → `147.135.8.100` (Cloudflare, DNS-only like the other
+2. **DNS**: `metrics.rrobinson.me` → `147.135.8.100` (Cloudflare, DNS-only like the other
    rrobinson.me hosts). cert-manager (`letsencrypt-prod`, HTTP-01 through the haproxy ingress)
    issues the certificate as soon as the name resolves; until then the Ingress simply waits.
 
@@ -97,7 +97,7 @@ Sync options that matter:
 
 | Resource | Name | Exposure |
 |---|---|---|
-| Grafana | Deployment `monitoring-grafana`, Service `monitoring-grafana:80` | **https://grafana.rrobinson.me** (haproxy + Let's Encrypt). User `admin`, password from the Secret. |
+| Grafana | Deployment `monitoring-grafana`, Service `monitoring-grafana:80` | **https://metrics.rrobinson.me** (haproxy + Let's Encrypt). User `admin`, password from the Secret. |
 | Prometheus | CR `kps` → pod `prometheus-kps-0`, Service `prometheus-operated:9090` / `kps-prometheus` | not exposed: `kubectl -n monitoring port-forward svc/prometheus-operated 9090` |
 | Alertmanager | CR `kps` → pod `alertmanager-kps-0`, Service `alertmanager-operated:9093` | not exposed: `kubectl -n monitoring port-forward svc/alertmanager-operated 9093` |
 | Prometheus Operator | Deployment `kps-operator` | — |
@@ -224,7 +224,7 @@ kubectl -n monitoring get ingress,certificate               # cert READY once DN
   missing from the Application; it is required.
 - **Grafana pod Pending / CreateContainerConfigError** — `grafana-admin-secret` is missing in
   `monitoring` (see prerequisites).
-- **Certificate not Ready** — DNS for `grafana.rrobinson.me` does not resolve yet, or the
+- **Certificate not Ready** — DNS for `metrics.rrobinson.me` does not resolve yet, or the
   haproxy HTTP-01 solver cannot be reached on port 80.
 - **A target shows `down` for a hostNetwork pod (Cosmic gameserver)** — the process failed to
   bind its metrics port at startup (dev and prod share the node's port space; they must use

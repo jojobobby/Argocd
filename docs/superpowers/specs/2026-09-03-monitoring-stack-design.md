@@ -35,13 +35,13 @@ deployed and reconciled by ArgoCD exactly like every other service in the cluste
 | Topic | Decision |
 |---|---|
 | Home of the platform stack | `jojobobby/Argocd` -> `monitoring/` umbrella chart (`monitoring-stack`). |
-| Chart packaging | Vendor `kube-prometheus-stack-88.6.4`, `loki-7.3.0`, `alloy-1.12.1` as tgz under `charts/`, not declared in `dependencies:` (offline render, same trade-off as Harbor/Jenkins). |
+| Chart packaging | Vendor `kube-prometheus-stack-88.6.4`, `loki-7.3.0`, `alloy-1.12.1` as tgz under `charts/` AND declare them in `dependencies:` with an empty `repository` (offline render like Harbor/Jenkins, but the declaration is required so Helm honours the nested `condition:` flags - without it Loki's MinIO/rollout-operator and the windows-exporter render too). |
 | ArgoCD registration | One Application `prod/monitoring.yaml` (cluster singleton, like cnpg-operator), namespace `monitoring`, `ServerSideApply=true` (the CRDs exceed the client-side-apply annotation limit). |
 | Metrics | kube-prometheus-stack: operator 0.93.1, Prometheus (15 d / 25 GiB cap, 30 GiB PVC), Alertmanager (2 GiB PVC), node-exporter, kube-state-metrics, default rules + dashboards. Prometheus selects ServiceMonitors / PodMonitors / PrometheusRules / Probes / ScrapeConfigs from **all** namespaces (`*NilUsesHelmValues: false`). |
 | k3s control plane | controller-manager, scheduler, etcd, kube-proxy targets disabled (only reachable on 127.0.0.1 inside the k3s process); disabling the targets also disables their `...Down` rules. |
 | Logs | Loki 3.6 single-binary, filesystem storage on a 30 GiB PVC, TSDB v13 schema, compactor retention 30 d, memcached caches / gateway / canary / helm-test disabled. |
 | Log shipping | Alloy 1.19 DaemonSet (`discovery.kubernetes` + `loki.source.kubernetes` filtered to its own node, plus `loki.source.kubernetes_events`), labels `namespace`, `pod`, `container`, `node`, `app`, `job=<ns>/<container>`. |
-| Grafana | 13.2 behind haproxy + cert-manager at `grafana.rrobinson.me`; admin credentials from the out-of-band Secret `grafana-admin-secret` (keys `admin-user`, `admin-password`); 5 GiB PVC (Recreate strategy); sidecar loads dashboards from ConfigMaps labelled `grafana_dashboard=1` in any namespace, folder from annotation `grafana_folder`; Loki added as a second datasource (uid `loki`). |
+| Grafana | 13.2 behind haproxy + cert-manager at `metrics.rrobinson.me`; admin credentials from the out-of-band Secret `grafana-admin-secret` (keys `admin-user`, `admin-password`); 5 GiB PVC (Recreate strategy); sidecar loads dashboards from ConfigMaps labelled `grafana_dashboard=1` in any namespace, folder from annotation `grafana_folder`; Loki added as a second datasource (uid `loki`). |
 | Exposure | Only Grafana is exposed. Prometheus and Alertmanager stay ClusterIP (port-forward). |
 | Security | node-exporter runs with `hostNetwork: false` (host-network would publish :9100 on the public IP). Operator admission webhook certificate issued by cert-manager instead of the chart's certgen Jobs. |
 | Alerting | Alertmanager keeps the chart's default `null` receiver; adding a Discord/Slack receiver is a values change documented in the README. |
@@ -55,7 +55,7 @@ deployed and reconciled by ArgoCD exactly like every other service in the cluste
 
 ```
 monitoring/
-  Chart.yaml                 name monitoring-stack, no dependencies: block
+  Chart.yaml                 name monitoring-stack; dependencies declared with repository ""
   charts/                    kube-prometheus-stack-88.6.4.tgz, loki-7.3.0.tgz, alloy-1.12.1.tgz
   values.yaml                all config, keyed by subchart name
   templates/NOTES.txt
@@ -103,7 +103,7 @@ Names: `fullnameOverride: kps` + `cleanPrometheusOperatorObjectNames: true` give
 ## Error handling / failure modes
 
 - Grafana pod stays Pending until `grafana-admin-secret` exists (created out of band first).
-- The Ingress exists before DNS; cert-manager retries HTTP-01 until `grafana.rrobinson.me`
+- The Ingress exists before DNS; cert-manager retries HTTP-01 until `metrics.rrobinson.me`
   resolves. Grafana is reachable through `kubectl port-forward` meanwhile.
 - If a ServiceMonitor target is down (e.g. the prod appserver that has been crash-looping
   since June), the Cosmic `...Down` alert fires - that is the intended signal.
@@ -128,5 +128,5 @@ Names: `fullnameOverride: kps` + `cleanPrometheusOperatorObjectNames: true` give
 - The prod appserver crash loop (enum `IncrementStatMoon` missing in image `tidan/cosmic:eab6ce8`)
   and the RollingUpdate/hostPort deadlock that keeps its replacement Pending.
 - Host firewall rules for the public IP (9090-9092 and anything else host-network).
-- Cloudflare DNS record for `grafana.rrobinson.me`.
+- Cloudflare DNS record for `metrics.rrobinson.me`.
 - Alert notification receivers (Discord etc.).

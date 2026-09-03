@@ -131,14 +131,14 @@ kube-prometheus-stack:
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
       hosts:
-        - grafana.rrobinson.me
+        - metrics.rrobinson.me
       tls:
-        - secretName: grafana.rrobinson.me-tls
+        - secretName: metrics.rrobinson.me-tls
           hosts:
-            - grafana.rrobinson.me
+            - metrics.rrobinson.me
     grafana.ini:
       server:
-        root_url: https://grafana.rrobinson.me
+        root_url: https://metrics.rrobinson.me
       analytics:
         check_for_updates: false
         reporting_enabled: false
