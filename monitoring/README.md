@@ -183,7 +183,8 @@ Accounts (all created through the admin API, none in git):
 
 - `admin` — the chart's built-in admin, password in the `grafana-admin-secret` Secret.
 - `raphealsmall@gmail.com` — Grafana **Server Admin** + Main Org **Admin** (the owner's account).
-- `dangergun`, `germoele`, `loxis`, `polity`, `xdelik` — Main Org **Viewer**, members of team `Cosmic Viewers`.
+- `xdelik` — Main Org **Admin** (every folder, datasource, Explore and user management; not a Server Admin).
+- `dangergun`, `germoele`, `loxis`, `polity` — Main Org **Viewer**, members of team `Cosmic Viewers`.
   A Viewer can open the Cosmic dashboards and their panels query Prometheus/Loki through
   them, but has **no Explore access** (the Viewer role lacks `datasources:explore`) and
   cannot see the Kubernetes or Loki folders.
