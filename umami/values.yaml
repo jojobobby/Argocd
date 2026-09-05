@@ -1,0 +1,53 @@
+# Umami (https://umami.is) - first-party, cookieless web analytics.
+#
+# One instance for the whole cluster; each site is a "website" inside Umami with its own
+# id, which the site embeds in its tracker <script> tag. See README.md for first login,
+# creating websites and wiring a site up.
+
+image:
+  # PostgreSQL build of Umami. GHCR publishes no per-version postgresql-* tags for v3
+  # (only postgresql-latest), so the release is pinned by digest: this one is the
+  # postgresql-latest index built 2026-08-20, i.e. Umami v3.3.1. To upgrade, resolve the
+  # new digest (see README.md) and bump appVersion in Chart.yaml.
+  repository: ghcr.io/umami-software/umami
+  tag: postgresql-latest
+  digest: sha256:fa32d116cf20cad52cbc3fad9a63b46e7fa02299d8f967168eb453d49c476b4a
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+# Renamed so the usual ad-blocker filter lists (which match /script.js and /api/send)
+# don't swallow our own first-party analytics. Sites load <host>/stats.js and the
+# tracker posts to <host>/api/collect.
+trackerScriptName: stats
+collectApiEndpoint: /api/collect
+
+ingress:
+  className: haproxy
+  clusterIssuer: letsencrypt-prod
+  host: analytics.cosmicv2.com
+  tlsSecret: analytics.cosmicv2.com-tls
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+    cpu: 1000m
+
+# CloudNativePG cluster (operator: the `cnpg-operator` ArgoCD app). Same image line as
+# BetterUs's cluster. The operator creates Secret `<name>-app` with a ready-made `uri`
+# for the application role, which is what Umami's DATABASE_URL reads.
+postgres:
+  name: umami-db
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.2
+  instances: 1
+  storage: 5Gi
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+      cpu: 1000m

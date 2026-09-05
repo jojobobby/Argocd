@@ -1,0 +1,29 @@
+# Umami's own database. Separate from every game database on purpose: the analytics
+# server is public-facing software with its own upgrade cycle, and a compromise there
+# must not be a compromise of anything else.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.postgres.name }}
+  labels:
+    app.kubernetes.io/name: umami
+    app.kubernetes.io/component: database
+spec:
+  instances: {{ .Values.postgres.instances }}
+  imageName: {{ .Values.postgres.imageName }}
+  storage:
+    size: {{ .Values.postgres.storage }}
+    resizeInUseVolumes: true
+  bootstrap:
+    initdb:
+      database: umami
+      owner: umami
+      encoding: UTF8
+      localeCType: C
+      localeCollate: C
+  postgresql:
+    parameters:
+      shared_buffers: 128MB
+      max_connections: "50"
+  resources:
+    {{- toYaml .Values.postgres.resources | nindent 4 }}

@@ -1,0 +1,12 @@
+apiVersion: v2
+name: umami
+description: >-
+  Self-hosted Umami web analytics for the Cosmic shop (and any other Tidan site that
+  wants first-party, cookieless usage analytics). One Umami server plus its own
+  CloudNativePG PostgreSQL cluster, deployed cluster-wide once (namespace `umami`) and
+  shared by the dev and prod sites as separate "websites" inside Umami.
+type: application
+# Version of THIS chart. Bump on template/values changes.
+version: 0.1.0
+# Umami release the image tag in values.yaml tracks.
+appVersion: "3.3.1"
