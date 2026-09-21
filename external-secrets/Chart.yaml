@@ -1,0 +1,12 @@
+apiVersion: v2
+name: external-secrets
+version: 1.0.0
+# Umbrella chart: the upstream External Secrets Operator (aliased `eso` so its
+# values don't collide with this chart's own name) plus the cluster-wide
+# OpenBao ClusterSecretStore and the ServiceAccount ESO uses to authenticate
+# to OpenBao. Same shape as cnpg-operator/ in this repo.
+dependencies:
+  - name: external-secrets
+    alias: eso
+    version: 2.11.0
+    repository: https://charts.external-secrets.io

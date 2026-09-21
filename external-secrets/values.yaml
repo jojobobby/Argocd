@@ -1,0 +1,27 @@
+# Upstream External Secrets Operator (aliased `eso`). Single node, so one
+# replica of each component. CRDs are installed by the chart (external-secrets.io/v1).
+eso:
+  installCRDs: true
+  replicaCount: 1
+  concurrent: 1
+  webhook:
+    replicaCount: 1
+  certController:
+    replicaCount: 1
+  # This cluster has no Prometheus-operator ServiceMonitor CRD; render nothing that needs it.
+  serviceMonitor:
+    enabled: false
+
+# --- OpenBao integration (this chart's own templates) ---
+openbao:
+  # In-cluster address of the self-managed OpenBao (ns secrets-manager). TLS ends
+  # at haproxy, so the in-cluster endpoint is plain http.
+  server: "http://openbao.secrets-manager.svc:8200"
+  # KV v2 mount and the OpenBao Kubernetes-auth role/policy that the setup script
+  # (in the arcana repo) provisions. The ServiceAccount below is bound to this role.
+  kvMount: "tidan"
+  kubernetesAuthMount: "kubernetes"
+  role: "arcana-eso"
+  # ServiceAccount ESO presents to OpenBao. It carries system:auth-delegator so
+  # OpenBao can TokenReview the login JWT.
+  serviceAccountName: "eso-openbao"
