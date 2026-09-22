@@ -1,0 +1,30 @@
+# ESO's controller ServiceAccount must be allowed to mint a token (TokenRequest)
+# for the eso-openbao SA, so the ClusterSecretStore can present THAT identity to
+# OpenBao's Kubernetes auth. Without this, ESO cannot create the token, falls
+# back to its own controller-SA token, and OpenBao rejects the login with
+# "service account name not authorized" (the role binds eso-openbao, not the
+# controller SA).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Values.openbao.serviceAccountName }}-token
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: [{{ .Values.openbao.serviceAccountName | quote }}]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.openbao.serviceAccountName }}-token
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Values.openbao.serviceAccountName }}-token
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.openbao.controllerServiceAccountName }}
+    namespace: {{ .Release.Namespace }}

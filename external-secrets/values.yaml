@@ -22,6 +22,9 @@ openbao:
   kvMount: "tidan"
   kubernetesAuthMount: "kubernetes"
   role: "arcana-eso"
-  # ServiceAccount ESO presents to OpenBao. It carries system:auth-delegator so
-  # OpenBao can TokenReview the login JWT.
+  # ServiceAccount ESO presents to OpenBao (the identity bound to the arcana-eso
+  # OpenBao role). ESO mints a token for it via TokenRequest.
   serviceAccountName: "eso-openbao"
+  # ESO's own controller ServiceAccount (from the upstream chart, <release>-eso).
+  # Granted create on serviceaccounts/token for serviceAccountName above.
+  controllerServiceAccountName: "external-secrets-eso"
