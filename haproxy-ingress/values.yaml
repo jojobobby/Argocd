@@ -13,6 +13,10 @@ kubernetes-ingress:
       default: true
     service:
       type: LoadBalancer
+      # ADDED: keep the visitor's real IP. With the default "Cluster" policy kube-proxy SNATs
+      # every connection, so backends (rate limits, the portfolio comment API) saw only an
+      # in-cluster address in X-Forwarded-For. Single node, so "Local" loses nothing.
+      externalTrafficPolicy: Local
       # ADDED: the stats/metrics port used to be published on the public LoadBalancer IP
       # (http://147.135.8.100:1024/metrics answered from the internet with every backend
       # and host name in the cluster). Only the traffic ports stay public; metrics are
