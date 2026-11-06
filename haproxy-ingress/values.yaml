@@ -44,6 +44,14 @@ kubernetes-ingress:
       enabled: true
       secret: haproxy-ingress-kubernetes-ingress-default-cert
 
+    # ADDED (2026-11-06): right-sized from the chart default 250m. Measured over 7 days per
+    # replica: p95 27m, max 53m. Memory request unchanged. Requests reserve node capacity and
+    # the node was 99% reserved while 19% used; there is no CPU limit, so bursts still get CPU.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 400Mi
+
     # ADDED: controller-wide configuration (haproxy.org global ConfigMap keys).
     config:
       # The controller listens on 8443 inside the pod and, by default, builds its HTTP->HTTPS
