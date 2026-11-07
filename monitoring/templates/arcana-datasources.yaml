@@ -1,0 +1,98 @@
+{{- /*
+Arcana's Postgres datasources, built by the cluster.
+
+External Secrets reads the generated reader password from the Postgres namespace (the Postgres
+chart lets only ServiceAccount grafana-pg-reader read that one Secret) and renders a Grafana
+datasource file into Secret grafana-datasource-arcana. The Grafana sidecar loads any Secret
+labelled grafana_datasource=1 in this namespace and reloads Grafana live, so a rotated password
+reaches Grafana without a restart or a person.
+*/}}
+{{- with .Values.arcanaDatasources }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana-pg-reader
+---
+# External Secrets' controller presents grafana-pg-reader's identity to the Kubernetes API, so it
+# must be allowed to mint a token for that one ServiceAccount (same pattern as eso-openbao).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: grafana-pg-reader-token
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: ["grafana-pg-reader"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: grafana-pg-reader-token
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: grafana-pg-reader-token
+subjects:
+  - kind: ServiceAccount
+    name: external-secrets-eso
+    namespace: external-secrets
+---
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: postgres-readers
+spec:
+  provider:
+    kubernetes:
+      remoteNamespace: {{ .sourceNamespace }}
+      server:
+        caProvider:
+          type: ConfigMap
+          name: kube-root-ca.crt
+          key: ca.crt
+      auth:
+        serviceAccount:
+          name: grafana-pg-reader
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: grafana-datasource-arcana
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: postgres-readers
+  target:
+    name: grafana-datasource-arcana
+    creationPolicy: Owner
+    template:
+      metadata:
+        labels:
+          grafana_datasource: "1"
+      data:
+        arcana-datasources.yaml: |
+          apiVersion: 1
+          datasources:
+          {{- range .databases }}
+            - name: {{ .name }}
+              uid: {{ .uid }}
+              type: grafana-postgresql-datasource
+              url: {{ $.Values.arcanaDatasources.host }}
+              user: {{ $.Values.arcanaDatasources.user }}
+              editable: false
+              jsonData:
+                database: {{ .database }}
+                sslmode: require
+                postgresVersion: 1700
+                maxOpenConns: 2
+              secureJsonData:
+                password: {{ "{{ .password | quote }}" }}
+          {{- end }}
+  data:
+    - secretKey: password
+      remoteRef:
+        key: {{ .sourceSecret }}
+        property: password
+{{- end }}

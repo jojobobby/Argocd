@@ -180,42 +180,6 @@ kube-prometheus-stack:
         jsonData:
           maxLines: 1000
           timeout: 60
-      # Arcana player retention dashboard (Arcana k8s/dashboards/arcana-player-retention.json). The grafana_reader
-      # role (Postgres chart, readerRoles) can read only Arcana's analytics_* views. Its password comes from the
-      # grafana-arcana-reader Secret below, created out of band (Arcana k8s/README.md "Player analytics").
-      - name: Arcana production
-        uid: arcana-postgres
-        type: grafana-postgresql-datasource
-        url: postgres-rw.postgres.svc.cluster.local:5432
-        user: grafana_reader
-        editable: false
-        jsonData:
-          database: arcana_production
-          sslmode: require
-          postgresVersion: 1700
-          maxOpenConns: 2
-        secureJsonData:
-          password: $ARCANA_READER_PASSWORD
-      - name: Arcana development
-        uid: arcana-postgres-dev
-        type: grafana-postgresql-datasource
-        url: postgres-rw.postgres.svc.cluster.local:5432
-        user: grafana_reader
-        editable: false
-        jsonData:
-          database: arcana_development
-          sslmode: require
-          postgresVersion: 1700
-          maxOpenConns: 2
-        secureJsonData:
-          password: $ARCANA_READER_PASSWORD
-    # optional: Grafana still starts before the Secret exists; only the two Arcana datasources fail to connect.
-    envValueFrom:
-      ARCANA_READER_PASSWORD:
-        secretKeyRef:
-          name: grafana-arcana-reader
-          key: password
-          optional: true
     resources:
       requests:
         cpu: 100m
@@ -486,3 +450,21 @@ alloy:
             cluster = "rrobinson-services",
           }
         }
+
+# Postgres datasources for the Arcana player retention dashboard (Arcana k8s/dashboards/
+# arcana-player-retention.json). templates/arcana-datasources.yaml turns these into a Secret the
+# Grafana sidecar loads live. The password is the cluster-generated `pg-reader-grafana-reader`
+# (Postgres chart, readerRoles), copied here by External Secrets: nobody creates or sees it.
+# The grafana_reader role can read only Arcana's analytics_* views (Arcana migration V027).
+arcanaDatasources:
+  user: grafana_reader
+  host: postgres-rw.postgres.svc.cluster.local:5432
+  sourceNamespace: postgres
+  sourceSecret: pg-reader-grafana-reader
+  databases:
+    - name: Arcana production
+      uid: arcana-postgres
+      database: arcana_production
+    - name: Arcana development
+      uid: arcana-postgres-dev
+      database: arcana_development
