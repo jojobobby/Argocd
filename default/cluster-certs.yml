@@ -1,70 +1,8 @@
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: betterourself.com
-  namespace: betterus-production
-spec:
-  secretName: betterourself.com-tls
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  dnsNames:
-    - betterourself.com
-    - www.betterourself.com
-    - api.betterourself.com
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: dev.betterourself.com
-  namespace: betterus-development
-spec:
-  secretName: dev.betterourself.com-tls
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  dnsNames:
-    - dev.betterourself.com
-    - api-dev.betterourself.com
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: lts.cosmicv2.com
-  namespace: default
-spec:
-  secretName: lts.cosmicv2.com-tls
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  dnsNames:
-    - lts.cosmicv2.com
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: lts-download-redirect
-  namespace: default
-  annotations:
-    haproxy.org/request-redirect: "http://server.rrobinson.me:8802/air/download"
-spec:
-  ingressClassName: haproxy
-  tls:
-    - hosts:
-        - lts.cosmicv2.com
-      secretName: lts.cosmicv2.com-tls
-  rules:
-    - host: lts.cosmicv2.com
-      http:
-        paths:
-          - path: /air/download
-            pathType: Prefix
-            backend:
-              service:
-                name: dummy-service
-                port:
-                  number: 80
----
+# Cluster-wide cert-manager issuers, plus certificates that belong to no app's Ingress.
+# 2026-11-08: removed the BetterUs certificates (each BetterUs Ingress makes its own; these
+# duplicates pointed at the same Secrets and reported IncorrectCertificate) and the lts.cosmicv2.com
+# certificate and /air/download redirect (it pointed at server.rrobinson.me:8802, which answers 503;
+# the Cosmic appserver's own Ingress and certificate serve lts.cosmicv2.com).
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
